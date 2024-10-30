@@ -1,12 +1,18 @@
-import numpy as np
+import torch.nn as nn
+import torch
 
-def SSLoss(output,A,B,C,K_transposed,init_cond):
-    Sx = output[1]
-    Su = output[1]
-    Sxp = output[1]
+def SSLoss(Sxp,Su,Sx,A,B,C,K_transposed,init_cond):
+    dx = 1
+    dxp = 1
+    du = 1
     
-    nominal = A - B*K_transposed*C
-    attacked = Sxp*(A-B*Su*K_transposed*Sx*C)*inv(Sxp)
+    nominal = A - B @ K_transposed @ C
+    attacked = Sxp @ (A - B @ Su @ K_transposed @ Sx @ C) @ torch.inverse(Sxp)
     
-    error = 1/2*(nominal-attacked)**2
+    mse_loss = nn.MSELoss()
+    error = mse_loss(nominal, attacked)
+    
+    return error
+
+    # drift = -Sxp*(A-B*Su*K_transposed*Sx*C)*torch.inv(Sxp)*dxp - Sxp*B*Su*K_transposed*dx + Sxp*B*du
     

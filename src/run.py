@@ -26,13 +26,14 @@ print(kwargs)
 solver = DetermineAttackability(**kwargs)
 
 # Generate state space data... format: [A,B,K.T,initial conditions]
-data_gen = StateSpaceGenerator(num_mats=1000)
-data = data_gen.generate(mat_size_min=2,mat_size_max=3,max_val=10)
-data = data.astype(np.float64)  # Ensure it's a compatible dtype
+data_gen = StateSpaceGenerator(num_mats=kwargs['num_mats'])
+data = data_gen.generate(mat_size=kwargs['system_order'], input_size = kwargs['input_size'],max_val=kwargs['max_val'])
+
+data = data.astype(np.float32)  # Ensure it's a compatible dtype
 data = torch.from_numpy(data)
 
 train_loader = DataLoader(
-    data, batch_size=10, shuffle=True
+    data, batch_size=kwargs['batch_size'], shuffle=True
 )
 
 # Train model

@@ -14,7 +14,7 @@ class StateSpaceGenerator:
         
         self.num_mats = num_mats
         
-    def generate(self, mat_size_min, mat_size_max, max_val):
+    def generate(self, mat_size, input_size, max_val):
         '''
         Generates random state space data
         
@@ -33,16 +33,13 @@ class StateSpaceGenerator:
         
         for _ in range(self.num_mats):
             
-            # Randomly choose a matrix size
-            mat_size = np.random.randint(mat_size_min, mat_size_max)
-            
             # Randomly generate the A matrix, B matrix, initial conditions
             A = np.random.rand(mat_size,mat_size)*max_val
-            B = np.random.rand(mat_size, 1)*max_val
+            B = np.random.rand(mat_size, input_size)*max_val
             
             # Determine stable K with LQR
             Q = np.eye(mat_size)
-            R = np.array([[1]])
+            R = np.eye(input_size)
             P = solve_continuous_are(A,B,Q,R)
             K = np.linalg.inv(R) @ B.T @ P
             
@@ -55,7 +52,12 @@ class StateSpaceGenerator:
             
             data.append(np.concatenate((A,B,K.T,init_cond),axis=1))
             
-        return np.array(data, dtype = object)
+        data = np.array(data, dtype = object)
+        
+        # Reshape to (total samples, 1 channel, rows, cols)
+        data = data.reshape(self.num_mats, 1,A.shape[0],A.shape[1]+B.shape[1]+K.shape[0]+init_cond.shape[1])
+            
+        return data
             
 if __name__ == "__main__":
     ssg = StateSpaceGenerator(num_mats=5)

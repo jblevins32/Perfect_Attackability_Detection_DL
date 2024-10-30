@@ -53,9 +53,11 @@ class DetermineAttackability:
         self.epochs = kwargs.pop("epochs", 10)
         self.warmup = kwargs.pop("warmup", 0)
         self.save_best = kwargs.pop("save_best", True)
+        self.n = kwargs.pop("system_order", 2)
+        self.m = kwargs.pop("input_size", 1)
         
         # Define the NN model
-        self.model = MyModel()
+        self.model = MyModel(self.n,self.m)
         print(self.model)
 
         # Move the model to the given device
@@ -77,19 +79,6 @@ class DetermineAttackability:
         self.best = 0
         self.best_cm = None # Confusion matrix
         self.best_model = None
-        
-    def forward(self, data):
-        '''
-        Forward pass on the data
-        
-        Args: 
-            data to train or test the model on
-        
-        Returns:
-            trained model
-            
-        '''
-        return self.model(data)
     
     def train(self, data):
         for epoch in range(self.epochs):
@@ -109,30 +98,31 @@ class DetermineAttackability:
                 data_batch = data_batch.to(self.device)
                 
                 # Get loss and update the model
-                out, loss = self._compute_loss_update_params(data_batch, target)
+                out, loss = self._compute_loss_update_params(data_batch)
                 
                 # Check accuracy
-                batch_acc = self._check_accuracy(out, target)
+                # batch_acc = self._check_accuracy(out)
 
                 # Losses updating and printing
                 losses.update(loss.item(), out.shape[0])
-                acc.update(batch_acc, out.shape[0])
+                # acc.update(batch_acc, out.shape[0])
 
+                # Update time and info every 10 epochs
                 iter_time.update(time.time() - start)
                 if idx % 10 == 0:
                     print(
                         (
-                            "Epoch: [{0}][{1}/{2}]\t"
+                            "Epoch: [{0}][{1}]\t"
                             "Time {iter_time.val:.3f} ({iter_time.avg:.3f})\t"
                             "Loss {loss.val:.4f} ({loss.avg:.4f})\t"
-                            "Prec @1 {top1.val:.4f} ({top1.avg:.4f})\t"
+                            # "Prec @1 {top1.val:.4f} ({top1.avg:.4f})\t"
                         ).format(
                             epoch,
                             idx,
-                            len(self.train_loader),
+                            # len(self.train_loader),
                             iter_time=iter_time,
                             loss=losses,
-                            top1=acc,
+                            # top1=acc,
                         )
                     )
         
@@ -144,7 +134,7 @@ class DetermineAttackability:
                 str(basedir) + "/checkpoints/" + self.model_type.lower() + ".pth",
             )
                 
-    def _compute_loss_update_params(self, data, target):
+    def _compute_loss_update_params(self, data):
         '''
         Computee the loss, update gradients, and get the output of the model
         
@@ -163,18 +153,24 @@ class DetermineAttackability:
         # If in training mode, update weights, otherwise do not
         if self.model.training:
 
-            # Main forward pass of the training algorithm
+            # Call the forward pass on the model. The data model() automatically calls model.forward()
             output = self.model(data)
             
             # Get loss by using output parameters and comparing A-BKC vs attacked model
-            A = data[:,:,:1]
-            B = data[:,:,2]
-            C = 1
-            K_transpose = data[:,:,3]
-            init_cond = data[:,:,4]
+            A = data[:,:,:,0:self.n].reshape(-1,self.n,self.n)
+            B = data[:,:,:,self.n:self.n+self.m].reshape(-1,self.n,self.m)
+            K_transpose = data[:,:,:self.m,self.n+self.m:self.n + 2*self.m].reshape(-1,self.m,self.m) # This is currently the top portion of these columns so leaving out the bottom
+            init_cond = data[:,:,:,self.n + 2*self.m:]
+            C = np.array([[1,0,0],[0,1,0]])
+            C = C.astype(np.float32)  # Ensure it's a compatible dtype
+            C = torch.from_numpy(C)
             
+            Sxp = output[:,0:self.n**2].reshape(-1,self.n,self.n)
+            Su = output[:,self.n**2:self.n**2 + self.m*self.m].reshape(-1,self.m,self.m)
+            Sx = output[:,self.n**2 + self.m*self.m:].reshape(-1,self.m,self.m)
+
             # Calculate loss
-            loss = SSLoss(output,A,B,C,K_transpose,init_cond)
+            loss = SSLoss(Sxp,Su,Sx,A,B,C,K_transpose,init_cond)
             
             # Main backward pass to Update gradients
             self.optimizer.zero_grad()
@@ -190,14 +186,14 @@ class DetermineAttackability:
 
         return output, loss
     
-    def _check_accuracy(self, output, target):
-        batch_size = target.shape[0]
+    # def _check_accuracy(self, output, target):
+    #     batch_size = target.shape[0]
         
-        # Get predicted class from output
-        _, pred = torch.max(output, dim=-1)
+    #     # Get predicted class from output
+    #     _, pred = torch.max(output, dim=-1)
         
-        correct = pred.eq(target).sum() * 1.0
+    #     correct = pred.eq(target).sum() * 1.0
         
-        acc = correct / batch_size
+    #     acc = correct / batch_size
         
-        return acc
+    #     return acc
