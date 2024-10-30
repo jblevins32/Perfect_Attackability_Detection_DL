@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.linalg import solve_continuous_are
+
 '''
 This program generates state spaces as data for ML models to train/test on
 '''
