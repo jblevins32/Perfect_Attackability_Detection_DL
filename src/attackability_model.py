@@ -2,9 +2,7 @@ import numpy as np
 import torch.nn as nn
 import time
 import torch
-from torch.utils.data import DataLoader
 import pathlib
-import yaml
 from model import MyModel
 from ss_loss import SSLoss
 
@@ -38,12 +36,8 @@ class DetermineAttackability:
         '''
         
         # Define some parameters if they are not passed in, and add all to object
-        self.path_prefix = kwargs.pop("path_prefix", ".")
-        self.imbalance = kwargs.pop("imbalance", "regular")
-        self.batch_size = kwargs.pop("batch_size", 128)
-        self.model_type = kwargs.pop("model", "TwoLayerNet")
+        self.batch_size = kwargs.pop("batch_size", 10)
         self.device = kwargs.pop("device", "cpu")
-        self.loss_type = kwargs.pop("loss_type", "CE")
         self.lr = kwargs.pop("learning_rate", 0.0001)
         self.momentum = kwargs.pop("momentum", 0.9)
         self.reg = kwargs.pop("reg", 0.0005)
@@ -53,8 +47,8 @@ class DetermineAttackability:
         self.epochs = kwargs.pop("epochs", 10)
         self.warmup = kwargs.pop("warmup", 0)
         self.save_best = kwargs.pop("save_best", True)
-        self.n = kwargs.pop("system_order", 2)
-        self.m = kwargs.pop("input_size", 1)
+        self.n = kwargs.pop("n", 2)
+        self.m = kwargs.pop("m", 1)
         
         # Define the NN model
         self.model = MyModel(self.n,self.m)
@@ -70,18 +64,18 @@ class DetermineAttackability:
             momentum=self.momentum,
             weight_decay=self.reg,
         )
-        
-        # Define the criterion / Loss function and send to device
-        self.criterion = nn.CrossEntropyLoss()
-        self.criterion = self.criterion.to(self.device)
                 
         # Reset items
-        self.best = 0
-        self.best_cm = None # Confusion matrix
-        self.best_model = None
+        # self.best = 0
+        # self.best_cm = None # Confusion matrix
+        # self.best_model = None
     
     def train(self, data):
         for epoch in range(self.epochs):
+            # Adjust learning rate
+            self._adjust_learning_rate(epoch)
+            
+            # Initialize a meter for printing info
             iter_time = AverageMeter()
             losses = AverageMeter()
             acc = AverageMeter()
@@ -156,18 +150,18 @@ class DetermineAttackability:
             # Call the forward pass on the model. The data model() automatically calls model.forward()
             output = self.model(data)
             
-            # Get loss by using output parameters and comparing A-BKC vs attacked model
+            # Partition out relevent matrices
             A = data[:,:,:,0:self.n].reshape(-1,self.n,self.n)
             B = data[:,:,:,self.n:self.n+self.m].reshape(-1,self.n,self.m)
-            K_transpose = data[:,:,:self.m,self.n+self.m:self.n + 2*self.m].reshape(-1,self.m,self.m) # This is currently the top portion of these columns so leaving out the bottom
+            K_transpose = data[:,:,:,self.n+self.m:self.n + 2*self.m].reshape(-1,self.m,self.n) 
             init_cond = data[:,:,:,self.n + 2*self.m:]
-            C = np.array([[1,0,0],[0,1,0]])
+            C = np.eye(self.n) #np.array([[1,0,0],[0,1,0]])
             C = C.astype(np.float32)  # Ensure it's a compatible dtype
             C = torch.from_numpy(C)
             
             Sxp = output[:,0:self.n**2].reshape(-1,self.n,self.n)
             Su = output[:,self.n**2:self.n**2 + self.m*self.m].reshape(-1,self.m,self.m)
-            Sx = output[:,self.n**2 + self.m*self.m:].reshape(-1,self.m,self.m)
+            Sx = output[:,self.n**2 + self.m*self.m:].reshape(-1,self.n,self.n)
 
             # Calculate loss
             loss = SSLoss(Sxp,Su,Sx,A,B,C,K_transpose,init_cond)
@@ -186,6 +180,19 @@ class DetermineAttackability:
 
         return output, loss
     
+    def _adjust_learning_rate(self, epoch):
+        epoch += 1
+        if epoch <= self.warmup:
+            lr = self.lr * epoch / self.warmup
+        elif epoch > self.steps[1]:
+            lr = self.lr * 0.01
+        elif epoch > self.steps[0]:
+            lr = self.lr * 0.1
+        else:
+            lr = self.lr
+        for param_group in self.optimizer.param_groups:
+            param_group["lr"] = lr
+            
     # def _check_accuracy(self, output, target):
     #     batch_size = target.shape[0]
         
