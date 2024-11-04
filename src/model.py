@@ -6,13 +6,14 @@ class MyModel(nn.Module):
         super(MyModel, self).__init__()
         
         # Calculate the output dimension based on n and m
-        output_dim = 2 * (n**2) + m**2
+        # output_dim = 2 * (n**2) + m**2
         
         # Define a simple fully connected neural network
+        linear_input_dim = n*(n+2*m)
         linear_output_dim = (2 * (n**2) + m**2) # Batchsize * 2 * (m**2) + n**2
          
         self.attack_model = nn.Sequential(
-            nn.Linear(24, 128),   # Input layer
+            nn.Linear(linear_input_dim, 128),   # Input layer
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.3),       # Dropout for regularization

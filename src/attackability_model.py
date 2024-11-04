@@ -5,6 +5,8 @@ import torch
 import pathlib
 from model import MyModel
 from ss_loss import SSLoss
+from IPython.display import clear_output
+import matplotlib.pyplot as plt
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -58,13 +60,20 @@ class DetermineAttackability:
         self.model = self.model.to(self.device)
 
         # Define the optimizer
-        self.optimizer = torch.optim.SGD(
+        # self.optimizer = torch.optim.SGD(
+        #     self.model.parameters(),
+        #     self.lr,
+        #     momentum=self.momentum,
+        #     weight_decay=self.reg,
+        # )
+        self.optimizer = torch.optim.Adam(
             self.model.parameters(),
             self.lr,
-            momentum=self.momentum,
-            weight_decay=self.reg,
+            weight_decay=self.reg
         )
-                
+               
+        self.train_losses = []
+         
         # Reset items
         # self.best = 0
         # self.best_cm = None # Confusion matrix
@@ -73,7 +82,7 @@ class DetermineAttackability:
     def train(self, data):
         for epoch in range(self.epochs):
             # Adjust learning rate
-            self._adjust_learning_rate(epoch)
+            # self._adjust_learning_rate(epoch)
             
             # Initialize a meter for printing info
             iter_time = AverageMeter()
@@ -88,7 +97,7 @@ class DetermineAttackability:
                 # Time it
                 start = time.time()
                 
-                # Gather data to put into model
+                # Gather data to be trained on the chosen device
                 data_batch = data_batch.to(self.device)
                 
                 # Get loss and update the model
@@ -119,15 +128,24 @@ class DetermineAttackability:
                             # top1=acc,
                         )
                     )
+            self.plot(loss)
         
         # Save the model
-        torch.save(self.model.state_dict(), 'model.pth')
+        torch.save(self.model.state_dict(), 'model2.pth')
         # if self.save_best:
         #     basedir = pathlib.Path(__file__).parent.resolve()
         #     torch.save(
         #         self.best_model.state_dict(),
         #         str(basedir) + "/checkpoints/" + self.model_type.lower() + ".pth",
         #     )
+        
+    def plot(self, loss):
+        self.train_losses.append(float(loss.detach().numpy()))
+        plt.plot(np.arange(1, len(self.train_losses) + 1), self.train_losses, label ='')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training Loss Over Time')
+        plt.pause(0.0000001)
                 
     def _compute_loss_update_params(self, data):
         '''
@@ -154,8 +172,8 @@ class DetermineAttackability:
             # Partition out relevent matrices
             A = data[:,:,:,0:self.n].reshape(-1,self.n,self.n)
             B = data[:,:,:,self.n:self.n+self.m].reshape(-1,self.n,self.m)
-            K_transpose = data[:,:,:,self.n+self.m:self.n + 2*self.m].reshape(-1,self.m,self.n) 
-            init_cond = data[:,:,:,self.n + 2*self.m:]
+            K = data[:,:,:,self.n+self.m:self.n + 2*self.m].reshape(-1,self.n,self.m).transpose(1,2)
+            # init_cond = data[:,:,:,self.n + 2*self.m:]
             C = np.eye(self.n) #np.array([[1,0,0],[0,1,0]])
             C = C.astype(np.float32)  # Ensure it's a compatible dtype
             C = torch.from_numpy(C)
@@ -165,7 +183,7 @@ class DetermineAttackability:
             Sx = output[:,self.n**2 + self.m*self.m:].reshape(-1,self.n,self.n)
 
             # Calculate loss
-            loss = SSLoss(Sxp,Su,Sx,A,B,C,K_transpose,init_cond)
+            loss = SSLoss(Sxp,Su,Sx,A,B,C,K)
             
             # Main backward pass to Update gradients
             self.optimizer.zero_grad()

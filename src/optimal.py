@@ -31,7 +31,7 @@ class optimal_attack_matrices:
         # Define state space
         A = np.array([[-2,1],
                       [0,1]])
-        B = np.array([[0],
+        B = np.array([[1],
                       [1]])
         
         # Define desired poles
@@ -41,25 +41,35 @@ class optimal_attack_matrices:
         Sx = x[0:4].reshape(A.shape[0],A.shape[1])
         Su = x[4]
         
-        transformed = Sx @ (A-(B*Su)@K@Sx)@np.linalg.inv(Sx)
+        transformed = Sx @ (A - (B * Su) @ K @ Sx) @ np.linalg.inv(Sx)
         
-        diff = np.linalg.norm(A - B@K - transformed)
+        diff = np.linalg.norm(A - (B @ K) - transformed)
         
         return diff
     
     def optimize(self):   
+        '''
+        Numerical optimization
+        
+        Args:
+            None
+            
+        Returns:
+            tuple: (optimal Sx, optimal Su)
+        '''
                      
         # Perform optimal search
         options = {'maxiter': 10000, 'disp': True, 'tol': self.tolerance}
         result = minimize(self.objective_func, initial_guess, method='Nelder-Mead', options=options)
         
+        diff = result.fun
         Sx_opt = result.x[0:4].reshape(2,2)
         Su_opt = result.x[-1]
         
-        return (Sx_opt, Su_opt)
+        return (Sx_opt, Su_opt), diff
         
         
 initial_guess = np.array([-2,1,-2,0,1])
 tol = 1e-4
 optimizer = optimal_attack_matrices(initial_guess,tol)
-result = optimizer.optimize()
+result, diff = optimizer.optimize()
