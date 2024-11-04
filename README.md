@@ -9,4 +9,4 @@ This project seeks to find a solution for determining perfect attack matrices fo
   - `ss_loss.py`: Loss function
   - `state_space_generator.py`: Data generator for state space models to train/test/evaluate on
 - `config.yaml`: Model training parameters
-
+- `model.pth`: saved model
