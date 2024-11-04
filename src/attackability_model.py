@@ -121,12 +121,13 @@ class DetermineAttackability:
                     )
         
         # Save the model
-        if self.save_best:
-            basedir = pathlib.Path(__file__).parent.resolve()
-            torch.save(
-                self.best_model.state_dict(),
-                str(basedir) + "/checkpoints/" + self.model_type.lower() + ".pth",
-            )
+        torch.save(self.model.state_dict(), 'model.pth')
+        # if self.save_best:
+        #     basedir = pathlib.Path(__file__).parent.resolve()
+        #     torch.save(
+        #         self.best_model.state_dict(),
+        #         str(basedir) + "/checkpoints/" + self.model_type.lower() + ".pth",
+        #     )
                 
     def _compute_loss_update_params(self, data):
         '''
