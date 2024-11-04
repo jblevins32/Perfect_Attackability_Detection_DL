@@ -1,3 +1,7 @@
+'''
+Run this script to train a model
+'''
+
 import yaml
 from attackability_model import DetermineAttackability
 from state_space_generator import StateSpaceGenerator

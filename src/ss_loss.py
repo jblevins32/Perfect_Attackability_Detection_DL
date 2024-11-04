@@ -10,9 +10,9 @@ def SSLoss(Sxp,Su,Sx,A,B,C,K):
     # eig_attacked = torch.linalg.eig(attacked).eigenvalues.abs()
     
     # diff = torch.log(torch.norm(eig_attacked-eig_nominal,p=2))
-    
-    diff= torch.log(torch.norm(nominal-attacked,p=2)+1e-6)
-    return diff
+    diff = nominal-attacked
+    loss = torch.log(torch.norm(diff,p=2)+1e-6)
+    return loss, diff
 
     # drift = -Sxp*(A-B*Su*K_transposed*Sx*C)*torch.inv(Sxp)*dxp - Sxp*B*Su*K_transposed*dx + Sxp*B*du
     

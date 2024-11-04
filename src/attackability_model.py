@@ -2,11 +2,9 @@ import numpy as np
 import torch.nn as nn
 import time
 import torch
-import pathlib
 from model import MyModel
-from ss_loss import SSLoss
-from IPython.display import clear_output
 import matplotlib.pyplot as plt
+from compute_loss_update_params import ComputeLossUpdateParams
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -29,12 +27,13 @@ class AverageMeter(object):
 class DetermineAttackability:
     def __init__(self, **kwargs):
         '''
-        Determine Sx,Su,Dx,Du for perfect undetectability
+        Determine Sxp,Sx,Su,Dx,Du for perfect undetectability
         
         Args:
-
+            *kwargs
+            
         Returns:
-
+            None
         '''
         
         # Define some parameters if they are not passed in, and add all to object
@@ -53,7 +52,7 @@ class DetermineAttackability:
         self.m = kwargs.pop("m", 1)
         
         # Define the NN model
-        self.model = MyModel(self.n,self.m)
+        self.model = MyModel(self.n,self.m,self.batch_size)
         print(self.model)
 
         # Move the model to the given device
@@ -73,42 +72,45 @@ class DetermineAttackability:
         )
                
         self.train_losses = []
-         
-        # Reset items
-        # self.best = 0
-        # self.best_cm = None # Confusion matrix
-        # self.best_model = None
     
     def train(self, data):
+        '''
+        Train the model
+        
+        Args:
+            data (nparray): input state space data (num_samples, 1, n, n + 2*m)
+            
+        Returns:
+            None, saves models and figs
+        '''
+        
+        # Main training loop
         for epoch in range(self.epochs):
-            # Adjust learning rate
-            # self._adjust_learning_rate(epoch)
+            
+            # Adjust learning rate for SGD
+            if isinstance(self.optimizer, torch.optim.SGD):
+                self._adjust_learning_rate(epoch)
             
             # Initialize a meter for printing info
             iter_time = AverageMeter()
             losses = AverageMeter()
-            acc = AverageMeter()
     
             # Put the model into training mode (versus eval mode)
             self.model.train()
 
             # Train on all data by batch. Note: enumerate() provides both the idx and data
             for idx, data_batch in enumerate(data):
-                # Time it
+                
                 start = time.time()
                 
                 # Gather data to be trained on the chosen device
                 data_batch = data_batch.to(self.device)
                 
                 # Get loss and update the model
-                out, loss = self._compute_loss_update_params(data_batch)
+                out, loss = ComputeLossUpdateParams(data_batch, self.model, self.n, self.m, self.optimizer)
                 
-                # Check accuracy
-                # batch_acc = self._check_accuracy(out)
-
                 # Losses updating and printing
                 losses.update(loss.item(), out.shape[0])
-                # acc.update(batch_acc, out.shape[0])
 
                 # Update time and info every 10 epochs
                 iter_time.update(time.time() - start)
@@ -118,20 +120,23 @@ class DetermineAttackability:
                             "Epoch: [{0}][{1}]\t"
                             "Time {iter_time.val:.3f} ({iter_time.avg:.3f})\t"
                             "Loss {loss.val:.4f} ({loss.avg:.4f})\t"
-                            # "Prec @1 {top1.val:.4f} ({top1.avg:.4f})\t"
                         ).format(
                             epoch,
                             idx,
-                            # len(self.train_loader),
                             iter_time=iter_time,
                             loss=losses,
-                            # top1=acc,
                         )
                     )
             self.plot(loss)
         
-        # Save the model
-        torch.save(self.model.state_dict(), 'model2.pth')
+        # Save the model and figs
+        model_name = f'models/model_{loss:.4f}.pth'
+        fig_name_png = f'figs/loss_{loss:.4f}.png'
+        fig_name_eps = f'figs/loss_{loss:.4f}.eps'
+        plt.savefig(fig_name_png)
+        plt.savefig(fig_name_eps)
+        torch.save(self.model.state_dict(), model_name)
+        
         # if self.save_best:
         #     basedir = pathlib.Path(__file__).parent.resolve()
         #     torch.save(
@@ -140,64 +145,22 @@ class DetermineAttackability:
         #     )
         
     def plot(self, loss):
+        '''
+        Plot loss live during training
+        
+        Args:
+            loss (int): loss at end of each epoch
+            
+        Returns:
+            None, plots loss over epoch
+        '''
+        
         self.train_losses.append(float(loss.detach().numpy()))
-        plt.plot(np.arange(1, len(self.train_losses) + 1), self.train_losses, label ='')
+        plt.plot(np.arange(1, len(self.train_losses) + 1), self.train_losses, label ='', color='blue')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.title('Training Loss Over Time')
         plt.pause(0.0000001)
-                
-    def _compute_loss_update_params(self, data):
-        '''
-        Computee the loss, update gradients, and get the output of the model
-        
-        Args:
-            data: input data to model
-            target: true labels
-            
-        Returns:
-            output: output of model
-            loss: loss value from data
-        '''
-        
-        output = None
-        loss = None
-        
-        # If in training mode, update weights, otherwise do not
-        if self.model.training:
-
-            # Call the forward pass on the model. The data model() automatically calls model.forward()
-            output = self.model(data)
-            
-            # Partition out relevent matrices
-            A = data[:,:,:,0:self.n].reshape(-1,self.n,self.n)
-            B = data[:,:,:,self.n:self.n+self.m].reshape(-1,self.n,self.m)
-            K = data[:,:,:,self.n+self.m:self.n + 2*self.m].reshape(-1,self.n,self.m).transpose(1,2)
-            # init_cond = data[:,:,:,self.n + 2*self.m:]
-            C = np.eye(self.n) #np.array([[1,0,0],[0,1,0]])
-            C = C.astype(np.float32)  # Ensure it's a compatible dtype
-            C = torch.from_numpy(C)
-            
-            Sxp = output[:,0:self.n**2].reshape(-1,self.n,self.n)
-            Su = output[:,self.n**2:self.n**2 + self.m*self.m].reshape(-1,self.m,self.m)
-            Sx = output[:,self.n**2 + self.m*self.m:].reshape(-1,self.n,self.n)
-
-            # Calculate loss
-            loss = SSLoss(Sxp,Su,Sx,A,B,C,K)
-            
-            # Main backward pass to Update gradients
-            self.optimizer.zero_grad()
-            loss.backward() # Compute gradients of all the parameters wrt the loss
-            self.optimizer.step() # Takes a SGD optimization step
-
-        else:
-            
-            # Do not update gradients
-            with torch.no_grad():
-                output = self.model(data)
-                loss = nn.CrossEntropyLoss(output, target)
-
-        return output, loss
     
     def _adjust_learning_rate(self, epoch):
         epoch += 1
@@ -211,15 +174,3 @@ class DetermineAttackability:
             lr = self.lr
         for param_group in self.optimizer.param_groups:
             param_group["lr"] = lr
-            
-    # def _check_accuracy(self, output, target):
-    #     batch_size = target.shape[0]
-        
-    #     # Get predicted class from output
-    #     _, pred = torch.max(output, dim=-1)
-        
-    #     correct = pred.eq(target).sum() * 1.0
-        
-    #     acc = correct / batch_size
-        
-    #     return acc
