@@ -50,9 +50,10 @@ class DetermineAttackability:
         self.save_best = kwargs.pop("save_best", True)
         self.n = kwargs.pop("n", 2)
         self.m = kwargs.pop("m", 1)
+        self.model_type = kwargs.pop("model_type", "linear")
         
         # Define the NN model
-        self.model = MyModel(self.n,self.m,self.batch_size)
+        self.model = MyModel(self.model_type,self.n,self.m,self.batch_size)
         print(self.model)
 
         # Move the model to the given device
@@ -83,6 +84,7 @@ class DetermineAttackability:
         Returns:
             None, saves models and figs
         '''
+        train_time_start = time.time()
         
         # Main training loop
         for epoch in range(self.epochs):
@@ -128,6 +130,10 @@ class DetermineAttackability:
                         )
                     )
             self.plot(loss)
+        
+        # Print training time
+        train_time_end = time.time()
+        print(f'Train Time: {train_time_end-train_time_start} Seconds')
         
         # Save the model and figs
         model_name = f'models/model_{loss:.4f}.pth'

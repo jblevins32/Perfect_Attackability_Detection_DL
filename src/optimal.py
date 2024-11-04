@@ -38,7 +38,7 @@ class optimal_attack_matrices:
         desired_poles = [-3, -4]
         K = place_poles(A,B,desired_poles).gain_matrix
         
-        Sx = x[0:4].reshape(A.shape[0],A.shape[1])
+        Sx = x[0:4].reshape(A.shape[0], A.shape[1])
         Su = x[4]
         
         transformed = Sx @ (A - (B * Su) @ K @ Sx) @ np.linalg.inv(Sx)

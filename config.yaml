@@ -2,7 +2,7 @@ Train:
   batch_size: 10
   learning_rate: 0.005
   reg: 0
-  epochs: 300
+  epochs: 100
   steps: [6, 8]
   warmup: 0
   momentum: 0.9
@@ -11,3 +11,4 @@ Train:
   m: 2 # Input size
   num_mats: 1000
   max_val: 10
+  model_type: "resnet" # linear, alexnet, resnet, customcnn

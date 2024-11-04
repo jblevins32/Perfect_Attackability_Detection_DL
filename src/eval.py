@@ -10,7 +10,7 @@ import numpy as np
 from compute_loss_update_params import ComputeLossUpdateParams
 
 # Instantiate model
-model = MyModel(3,2,1)
+model = MyModel("linear",3,2,1)
 
 # Load model weights in eval mode: choose model path as needed!
 model_path = 'models/model_-0.3892.pth'
