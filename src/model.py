@@ -2,7 +2,7 @@ import torch.nn as nn
 from torchvision.models import alexnet, resnet18
 
 class MyModel(nn.Module):
-    def __init__(self, model_type, n, m, batch_size):
+    def __init__(self, model_type, n, m, p, batch_size):
         super(MyModel, self).__init__()
         
         # Calculate the output dimension based on n and m
@@ -11,11 +11,11 @@ class MyModel(nn.Module):
         self.model_type = model_type
         
         # Define a simple fully connected neural network
-        self.linear_input_dim = n*(n+2*m)
-        self.linear_output_dim = (2 * (n**2) + m**2) # Batchsize * 2 * (m**2) + n**2
+        self.linear_input_dim = n*(n+2*m+p+1)
+        self.linear_output_dim = (n**2) + 2*(m**2) # Batchsize * 2 * (m**2) + n**2
         
         if self.model_type == "linear":
-            drop_rate = 0.1
+            drop_rate = 0.01
             
             self.attack_model = nn.Sequential(
                 nn.Linear(self.linear_input_dim, 128),   # Input layer
@@ -34,6 +34,16 @@ class MyModel(nn.Module):
                 nn.Dropout(drop_rate),
                 
                 nn.Linear(512, 1024),
+                nn.BatchNorm1d(1024),
+                nn.ReLU(),
+                nn.Dropout(drop_rate),
+                
+                nn.Linear(1024, 2048),
+                nn.BatchNorm1d(2048),
+                nn.ReLU(),
+                nn.Dropout(drop_rate),
+                
+                nn.Linear(2048, 1024),
                 nn.BatchNorm1d(1024),
                 nn.ReLU(),
                 nn.Dropout(drop_rate),

@@ -14,7 +14,7 @@ class StateSpaceGenerator:
         
         self.num_mats = num_mats
         
-    def generate(self, mat_size, input_size, max_val):
+    def generate(self, mat_size, input_size, output_size, max_val):
         '''
         Generates random state space data
         
@@ -29,44 +29,53 @@ class StateSpaceGenerator:
         
         # Initialize data vector
         data = []
+        mat_counter = self.num_mats
         
-        for _ in range(self.num_mats):
+        while mat_counter != 0:
             
-            # Randomly generate the A matrix, B matrix
+            # Randomly generate the A matrix, B matrix, C matrix, and initial conditions (ic)
             A = (np.random.rand(mat_size,mat_size)-0.5)*max_val # Generates values between [-max_val/2 , max_val/2]
             B = np.random.rand(mat_size, input_size)*max_val # Generates values between [0 , max_val]
+            C = np.random.rand(output_size, mat_size)
+            C = (C > 0.5).astype(int) # turn c into binary values only
+            ic = np.random.rand(mat_size,1)*max_val 
             
             # Determine stable K with LQR
-            Q = np.eye(mat_size)
-            R = np.eye(input_size)
-            P = solve_continuous_are(A,B,Q,R)
-            K = np.linalg.inv(R) @ B.T @ P
+            # Q = np.eye(output_size)
+            # R = np.eye(input_size)
+            # P = solve_continuous_are(A,B,Q,R)
+            # K = np.linalg.inv(R) @ B.T @ P
+            
+            K = np.random.rand(input_size, output_size)
             
             # Randomly assign initial conditions
             # initcond: init_cond = np.random.rand(mat_size, 1)*max_val
             
             # Check if the closed loop system is not stable, if so, skip
-            if self.check_stability(A, B, K):
+            if self.check_stability(A, B, K, C):
                 continue
         
             # Check if the system is not controllable, if so, skip
             if self.check_controllability(A,B):
                 continue
             
-            #initcond: data.append(np.concatenate((A,B,K.T,init_cond),axis=1))
-            data.append(np.concatenate((A,B,K.T),axis=1))
+            mat_counter -= 1
+
+            cat = np.array([1,1]).reshape(-1,1)            
+            K = np.concatenate(((K,cat)),axis=1)
+            data.append(np.concatenate((A,B,K.T,C.T,ic),axis=1))
 
         data = np.array(data, dtype = object)
         
         # Reshape to (total samples, 1 channel, rows, cols)
         # initcond: data = data.reshape(self.num_mats, 1,A.shape[0],A.shape[1]+B.shape[1]+K.shape[0]+init_cond.shape[1])
-        data = data.reshape(self.num_mats, 1,A.shape[0],A.shape[1]+B.shape[1]+K.shape[0])
+        data = data.reshape(self.num_mats, 1,A.shape[0],A.shape[1]+B.shape[1]+K.shape[0]+C.shape[0]+ic.shape[1])
             
         return data
     
-    def check_stability(self, A, B, K):
-        stable_bool = ((np.linalg.eig(A-np.dot(B,K))[0]).real >= 0).any()
-        if stable_bool: print("A SS was found to be unstable")
+    def check_stability(self, A, B, K, C):
+        stable_bool = (((np.linalg.eig(A-B @ K @ C))[0]).real >= 0).any()
+        # if stable_bool: print("A SS was found to be unstable")
         return stable_bool
     
     def check_controllability(self, A, B):

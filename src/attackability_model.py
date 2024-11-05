@@ -50,10 +50,11 @@ class DetermineAttackability:
         self.save_best = kwargs.pop("save_best", True)
         self.n = kwargs.pop("n", 2)
         self.m = kwargs.pop("m", 1)
+        self.p = kwargs.pop("p", 1)
         self.model_type = kwargs.pop("model_type", "linear")
         
         # Define the NN model
-        self.model = MyModel(self.model_type,self.n,self.m,self.batch_size)
+        self.model = MyModel(self.model_type,self.n,self.m,self.p,self.batch_size)
         print(self.model)
 
         # Move the model to the given device
@@ -89,7 +90,7 @@ class DetermineAttackability:
         # Main training loop
         for epoch in range(self.epochs):
             
-            # Adjust learning rate for SGD
+            # Adjust learning rate for SGD optimizer
             if isinstance(self.optimizer, torch.optim.SGD):
                 self._adjust_learning_rate(epoch)
             
@@ -109,7 +110,7 @@ class DetermineAttackability:
                 data_batch = data_batch.to(self.device)
                 
                 # Get loss and update the model
-                out, loss = ComputeLossUpdateParams(data_batch, self.model, self.n, self.m, self.optimizer)
+                out, loss = ComputeLossUpdateParams(data_batch, self.model, self.n, self.m, self.p, self.optimizer)
                 
                 # Losses updating and printing
                 losses.update(loss.item(), out.shape[0])

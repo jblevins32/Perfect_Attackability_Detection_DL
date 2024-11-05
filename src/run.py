@@ -32,7 +32,7 @@ solver = DetermineAttackability(**kwargs)
 
 # Generate state space data... format: [A,B,K.T,initial conditions]
 data_gen = StateSpaceGenerator(num_mats=kwargs['num_mats'])
-data = data_gen.generate(mat_size=kwargs['n'], input_size = kwargs['m'],max_val=kwargs['max_val'])
+data = data_gen.generate(mat_size=kwargs['n'], input_size = kwargs['m'], output_size = kwargs['p'], max_val=kwargs['max_val'])
 
 # Ensure it's a compatible dtype
 data = data.astype(np.float32)

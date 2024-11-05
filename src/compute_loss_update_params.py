@@ -2,7 +2,7 @@ import torch
 from partition_mats import PartitionMats
 from ss_loss import SSLoss
 
-def ComputeLossUpdateParams(data, model, n, m, optimizer = None):
+def ComputeLossUpdateParams(data, model, n, m, p, optimizer = None):
     '''
     Computee the loss, update gradients, and get the output of the model
     
@@ -25,10 +25,10 @@ def ComputeLossUpdateParams(data, model, n, m, optimizer = None):
         output = model(data)
         
         # Partition out relevent matrices
-        Sxp,Su,Sx,A,B,C,K = PartitionMats(data,output,n,m)
+        Sxp,Su,Sx,A,B,C,K,ic = PartitionMats(data,output,n,m,p)
 
         # Calculate loss
-        loss, diff = SSLoss(Sxp,Su,Sx,A,B,C,K)
+        loss, diff = SSLoss(Sxp,Su,Sx,A,B,C,K,ic)
         
         # Main backward pass to Update gradients
         optimizer.zero_grad()
