@@ -1,0 +1,4 @@
+name: your_environment_name
+channels:
+  - defaults
+prefix: /home/jblevins32/anaconda3/envs/your_environment_name
